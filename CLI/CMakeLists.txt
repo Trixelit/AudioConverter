@@ -13,6 +13,8 @@ link_directories(
         ${FFMPEG_ROOT}/lib
 )
 
-add_executable(AudioConverter main.cpp)
+add_executable(AudioConverter main.cpp
+        converter.cpp
+        converter.h)
 
 target_link_libraries(AudioConverter avformat avcodec avutil swresample)

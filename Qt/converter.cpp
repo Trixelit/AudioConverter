@@ -1,3 +1,6 @@
+//
+// Created by Trixie on 12/02/2026.
+//
 #include <iostream>
 #include <string>
 #include <windows.h>
@@ -8,6 +11,7 @@ extern "C" {
 #include <libswresample/swresample.h>
 #include <libavutil/opt.h>
 }
+#include "converter.h"
 
 std::string ffmpeg_err(int err) {
     char buf[AV_ERROR_MAX_STRING_SIZE];
@@ -15,58 +19,10 @@ std::string ffmpeg_err(int err) {
     return std::string(buf);
 }
 
-enum class Target {
-    TARGET_YEASTAR,
-    TARGET_3CX
-};
+int convertAudio(const std::string& inPath, const std::string& outPath, Target target) {
 
-/*int main(int argc, char** argv) {
-    std::cout << "HELLO FROM MAIN\n";
-    std::cout << "argc = " << argc << "\n";
-
-    for (int i = 0; i < argc; i++) {
-        std::cout << "argv[" << i << "] = " << argv[i] << "\n";
-    }
-
-    std::cout << "Sleeping for 5 seconds...\n";
-    Sleep(5000);
-
-    return 0;
-}*/
-
-int main(int argc, char** argv) {
-    std::cout << "argc = " << argc << "\n";
-    for (int i = 0; i < argc; i++) {
-        std::cout << "argv[" << i << "] = " << argv[i] << "\n";
-    }
-
-    if (argc < 4) {
-        std::cerr << "Usage: audioconvert <infile> <outfile> --target yeastar|3cx\n";
-        return 1;
-    }
-
-
-
-    const char* inputPath = argv[1];
-    const char* outputPath = argv[2];
-
-    Target target;
-
-    if (std::string(argv[3]) != "--target") {
-        std::cerr << "Missing --target parameter\n";
-        return 1;
-    }
-
-    std::string targetStr = argv[4];
-
-    if (targetStr == "yeastar") {
-        target = Target::TARGET_YEASTAR;
-    } else if (targetStr == "3cx") {
-        target = Target::TARGET_3CX;
-    } else {
-        std::cerr << "Unknown target parameter: " << targetStr << "\n";
-        return 1;
-    }
+    const char* inputPath = inPath.c_str();
+    const char* outputPath = outPath.c_str();
 
     AVFormatContext* fmt = nullptr;
 
@@ -122,6 +78,13 @@ int main(int argc, char** argv) {
     const AVSampleFormat OUT_SAMPLE_FMT = AV_SAMPLE_FMT_S16;
     const AVChannelLayout OUT_CH_LAYOUT = AV_CHANNEL_LAYOUT_MONO;
 
+    if (decoderContext->ch_layout.nb_channels == 0) {
+        av_channel_layout_default(
+            &decoderContext->ch_layout,
+            audioStream->codecpar->ch_layout.nb_channels
+        );
+    }
+
     SwrContext* swr = swr_alloc();
 
     av_opt_set_chlayout(swr, "in_chlayout", &decoderContext->ch_layout, 0);
@@ -131,6 +94,7 @@ int main(int argc, char** argv) {
     av_opt_set_chlayout(swr, "out_chlayout", &OUT_CH_LAYOUT, 0);
     av_opt_set_int(swr, "out_sample_rate", OUT_SAMPLE_RATE, 0);
     av_opt_set_sample_fmt(swr, "out_sample_fmt", OUT_SAMPLE_FMT, 0);
+
 
     swr_init(swr);
 
@@ -179,10 +143,23 @@ int main(int argc, char** argv) {
             outFrame->sample_rate = OUT_SAMPLE_RATE;
             outFrame->format = OUT_SAMPLE_FMT;
 
-            outFrame->nb_samples = swr_get_out_samples(swr, inFrame->nb_samples);
+            outFrame->nb_samples = inFrame->nb_samples;
             av_frame_get_buffer(outFrame, 0);
 
-            swr_convert_frame(swr, outFrame, inFrame);
+            int out_samples = swr_convert(
+                swr,
+                outFrame->data,
+                outFrame->nb_samples,
+                (const uint8_t**)inFrame->data,
+                inFrame->nb_samples
+            );
+
+            if (out_samples < 0) {
+                std::cerr << "swr_convert failed: " << ffmpeg_err(out_samples) << "\n";
+                break;
+            }
+
+            outFrame->nb_samples = out_samples;
 
             outFrame->pts = samples_written;
             samples_written += outFrame->nb_samples;
@@ -210,6 +187,12 @@ int main(int argc, char** argv) {
     }
     av_write_trailer(outFmt);
 
+    avcodec_free_context(&decoderContext);
+    avcodec_free_context(&encoderContext);
+    swr_free(&swr);
+    av_frame_free(&inFrame);
+    av_frame_free(&outFrame);
+    avformat_free_context(outFmt);
     avformat_close_input(&fmt);
     return 0;
 }

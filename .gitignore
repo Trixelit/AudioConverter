@@ -1,0 +1,4 @@
+.idea/
+.qtcreator/
+cmake-build-release/
+cmake-build-debug/
