@@ -14,7 +14,7 @@ link_directories(
 )
 
 add_executable(AudioConverter main.cpp
-        converter.cpp
-        converter.h)
+converter.cpp
+converter.h)
 
 target_link_libraries(AudioConverter avformat avcodec avutil swresample)

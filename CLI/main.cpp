@@ -4,17 +4,6 @@
 
 
 int main(int argc, char** argv) {
-    std::cout << "argc = " << argc << "\n";
-    for (int i = 0; i < argc; i++) {
-        std::cout << "argv[" << i << "] = " << argv[i] << "\n";
-    }
-
-    if (argc < 5) {
-        std::cerr << "Usage: audioconvert <infile> <outfile> --target yeastar|3cx\n";
-        return 1;
-    }
-
-
 
     const char* inputPath = argv[1];
     const char* outputPath = argv[2];
