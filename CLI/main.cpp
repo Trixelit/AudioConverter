@@ -5,6 +5,11 @@
 
 int main(int argc, char** argv) {
 
+    if (argc < 5) {
+        std::cerr << "Usage: audioconvert <infile> <outfile> --target yeastar|3cx\n";
+        return 1;
+    }
+
     const char* inputPath = argv[1];
     const char* outputPath = argv[2];
 
