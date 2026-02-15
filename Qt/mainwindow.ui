@@ -11,24 +11,14 @@
    </rect>
   </property>
   <property name="windowTitle">
-   <string>MainWindow</string>
+   <string>AudioConverter</string>
   </property>
   <property name="styleSheet">
    <string notr="true">background-color: 1e1e1e</string>
   </property>
   <widget class="QWidget" name="centralwidget">
    <property name="styleSheet">
-    <string notr="true">QWidget {
-    background-color: #1e1e1e;
-    color: #e0e0e0;
-}
-
-QLineEdit {
-    background-color: #2a2a2a;
-    border: 1px solid #3c3c3c;
-    padding: 4px;
-    border-radius: 4px;
-}</string>
+    <string notr="true"/>
    </property>
    <layout class="QVBoxLayout" name="verticalLayout">
     <item>
@@ -65,6 +55,9 @@ QLineEdit {
         <property name="styleSheet">
          <string notr="true"/>
         </property>
+        <property name="placeholderText">
+         <string>Enter file path, or click Browse...</string>
+        </property>
        </widget>
       </item>
       <item>
@@ -89,6 +82,9 @@ QLineEdit {
        <widget class="QLineEdit" name="outFilePath">
         <property name="styleSheet">
          <string notr="true"/>
+        </property>
+        <property name="placeholderText">
+         <string>Enter file path, or click Browse...</string>
         </property>
        </widget>
       </item>
@@ -194,22 +190,6 @@ QLineEdit {
      </layout>
     </item>
    </layout>
-  </widget>
-  <widget class="QMenuBar" name="menubar">
-   <property name="geometry">
-    <rect>
-     <x>0</x>
-     <y>0</y>
-     <width>800</width>
-     <height>21</height>
-    </rect>
-   </property>
-   <widget class="QMenu" name="menuAudio_Converter">
-    <property name="title">
-     <string>Audio Converter</string>
-    </property>
-   </widget>
-   <addaction name="menuAudio_Converter"/>
   </widget>
  </widget>
  <resources/>

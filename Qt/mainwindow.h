@@ -20,7 +20,9 @@ public:
 private slots:
     void on_inBrowseButton_clicked();
 
-    void on_outBrowseButton_2_clicked();
+    void on_outBrowseButton_clicked();
+
+    void on_convertButton_clicked();
 
 private:
     Ui::MainWindow *ui;
