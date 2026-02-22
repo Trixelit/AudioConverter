@@ -24,6 +24,8 @@ private slots:
 
     void on_convertButton_clicked();
 
+    void on_batchCheckBox_checkStateChanged(const Qt::CheckState &arg1);
+
 private:
     Ui::MainWindow *ui;
 };
