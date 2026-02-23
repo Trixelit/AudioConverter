@@ -2,6 +2,7 @@
 #define MAINWINDOW_H
 
 #include <QMainWindow>
+#include "fileitemwidget.h"
 
 QT_BEGIN_NAMESPACE
 namespace Ui {
@@ -28,5 +29,6 @@ private slots:
 
 private:
     Ui::MainWindow *ui;
+    QVector<FileItemWidget*> m_fileWidgets;
 };
 #endif // MAINWINDOW_H

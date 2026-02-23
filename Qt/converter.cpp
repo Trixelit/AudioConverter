@@ -1,6 +1,7 @@
 //
 // Created by Trixie on 12/02/2026.
 //
+#include <functional>
 #include <iostream>
 #include <string>
 #include <windows.h>
@@ -19,7 +20,42 @@ std::string ffmpeg_err(int err) {
     return std::string(buf);
 }
 
-int convertAudio(const std::string& inPath, const std::string& outPath, Target target) {
+double getAudioDurationSeconds(const std::string& path) {
+    AVFormatContext* fmt = nullptr;
+
+    if (avformat_open_input(&fmt, path.c_str(), nullptr, nullptr) < 0) {
+        return 0.0;
+    }
+
+    if (avformat_find_stream_info(fmt, nullptr) < 0) {
+        avformat_close_input(&fmt);
+        return 0.0;
+    }
+
+    double seconds = 0.0;
+
+    //Try stream duration first
+    for (unsigned i = 0; i < fmt->nb_streams; ++i) {
+        if (fmt->streams[i]->codecpar->codec_type == AVMEDIA_TYPE_AUDIO) {
+            AVStream* stream = fmt->streams[i];
+
+            if (stream->duration > 0) {
+                seconds = stream->duration * av_q2d(stream->time_base);
+            }
+            break;
+        }
+    }
+
+    //fallback to container duration
+    if (seconds <= 0.0 && fmt->duration > 0) {
+        seconds = fmt->duration / (double)AV_TIME_BASE;
+    }
+
+    avformat_close_input(&fmt);
+    return seconds;
+}
+
+int convertAudio(const std::string& inPath, const std::string& outPath, Target target, std::function<void(double)> progressCallback) {
 
     const char* inputPath = inPath.c_str();
     const char* outputPath = outPath.c_str();
@@ -95,6 +131,14 @@ int convertAudio(const std::string& inPath, const std::string& outPath, Target t
     av_opt_set_int(swr, "out_sample_rate", OUT_SAMPLE_RATE, 0);
     av_opt_set_sample_fmt(swr, "out_sample_fmt", OUT_SAMPLE_FMT, 0);
 
+    double total_seconds = 0.0;
+
+    // try stream duration first, otherwise fallback to container duration
+    if (audioStream->duration > 0) {
+        total_seconds = audioStream->duration * av_q2d(audioStream->time_base);
+    } else if (fmt->duration > 0) {
+        total_seconds = fmt->duration / (double)AV_TIME_BASE;
+    }
 
     swr_init(swr);
 
@@ -129,6 +173,7 @@ int convertAudio(const std::string& inPath, const std::string& outPath, Target t
     AVFrame* inFrame = av_frame_alloc();
     AVFrame* outFrame = av_frame_alloc();
     int64_t samples_written = 0;
+    double lastReported = 0.0;
 
     while (av_read_frame(fmt, &pkt) >= 0) {
         if (pkt.stream_index != audioStreamIndex) {
@@ -139,6 +184,27 @@ int convertAudio(const std::string& inPath, const std::string& outPath, Target t
         avcodec_send_packet(decoderContext, &pkt);
 
         while (avcodec_receive_frame(decoderContext, inFrame) == 0) {
+
+            if (progressCallback &&
+                total_seconds > 0 &&
+                inFrame->pts != AV_NOPTS_VALUE)
+            {
+                double current_seconds =
+                    inFrame->pts * av_q2d(audioStream->time_base);
+
+                double progress =
+                    current_seconds / total_seconds;
+
+                if (progress < 0.0) progress = 0.0;
+                if (progress > 1.0) progress = 1.0;
+
+                if (progress - lastReported >= 0.01)
+                {
+                    lastReported = progress;
+                    progressCallback(progress);
+                }
+            }
+
             outFrame->ch_layout = OUT_CH_LAYOUT;
             outFrame->sample_rate = OUT_SAMPLE_RATE;
             outFrame->format = OUT_SAMPLE_FMT;
@@ -194,5 +260,6 @@ int convertAudio(const std::string& inPath, const std::string& outPath, Target t
     av_frame_free(&outFrame);
     avformat_free_context(outFmt);
     avformat_close_input(&fmt);
+    if (progressCallback) progressCallback(1.0);
     return 0;
 }

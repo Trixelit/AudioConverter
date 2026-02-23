@@ -4,6 +4,9 @@
 #include <QFileDialog>
 #include <QMessageBox>
 #include <QStringList>
+#include <QThread>
+#include "worker.h"
+#include "fileitemwidget.h"
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -65,55 +68,75 @@ void MainWindow::on_convertButton_clicked()
     ui->inBrowseButton->setEnabled(false);
     ui->outBrowseButton->setEnabled(false);
     ui->convertButton->setEnabled(false);
-    QApplication::processEvents();
 
     Target target;
 
     if (ui->radio3cx->isChecked()) {
         target = Target::TARGET_3CX;
-    } else {
+    } else if (ui->radioYeastar->isChecked()) {
         target = Target::TARGET_YEASTAR;
+    } else {
+        QMessageBox::warning(this, "Missing Target", "Please select a target system.");
+        return;
     }
 
     bool batchMode = ui->batchCheckBox->isChecked();
+    QStringList inputFiles = ui->inFilePath->text().split(";", Qt::SkipEmptyParts);
+    QString outputPath = ui->outFilePath->text();
 
-    if (!batchMode) {
-        if (convertAudio(ui->inFilePath->text().toStdString(), ui->outFilePath->text().toStdString(), target) == 0) {
-            QMessageBox::information(this, "Success", "Conversion completed successfully.");
-        } else {
-            QMessageBox::critical(this, "Error", "Conversion failed, please check the input and output paths are valid.");
-        }
-    } else {
-        QStringList inputFiles = ui->inFilePath->text().split(";", Qt::SkipEmptyParts);
+    ui->fileListWidget->clear();
 
-        QString outDir = ui->outFilePath->text();
+    m_fileWidgets.clear();
 
-        int successCount = 0;
-        int failCount = 0;
+    for (const QString& file : std::as_const(inputFiles)) {
+        QListWidgetItem* item = new QListWidgetItem(ui->fileListWidget);
 
-        for (const QString& file : inputFiles) {
-            QString trimmed = file.trimmed();
-            QFileInfo info(trimmed);
+        double duration = getAudioDurationSeconds(file.toStdString());
 
-            QString outPath = outDir + "/" + info.baseName() + ".wav";
+        auto* widget = new FileItemWidget(file, duration);
 
-            int result = convertAudio(trimmed.toStdString(), outPath.toStdString(), target);
+        item->setSizeHint(widget->sizeHint());
+        ui->fileListWidget->addItem(item);
+        ui->fileListWidget->setItemWidget(item, widget);
 
-            if (result == 0) {
-                successCount++;
-            } else {
-                failCount++;
-            }
-
-            QApplication::processEvents();
-        }
-
-        QMessageBox::information(this, "Batch Complete", QString("Success: %1\nFailed: %2").arg(successCount).arg(failCount));
+        m_fileWidgets.append(widget);
     }
 
-    ui->inBrowseButton->setEnabled(true);
-    ui->outBrowseButton->setEnabled(true);
-    ui->convertButton->setEnabled(true);
+    QThread* thread = new QThread;
+    Worker* worker = new Worker(inputFiles, outputPath, target, batchMode);
+
+    worker->moveToThread(thread);
+
+    // When thread starts -> run worker
+    connect(thread, &QThread::started, worker, &Worker::process);
+
+    // connect progress bar updates
+    connect(worker, &Worker::fileProgress, this, [this](int index, double progress) {
+        if (index >= 0 && index < m_fileWidgets.size()) {
+            m_fileWidgets[index]->setProgress(progress);
+
+            QListWidgetItem* item = ui->fileListWidget->item(index);
+
+            ui->fileListWidget->scrollToItem(item, QAbstractItemView::PositionAtBottom);
+        }
+    });
+
+
+    // When finished
+    connect(worker, &Worker::finished, this, [=](int successCount, int failCount){
+        QMessageBox::information(this, "Done", QString("Success: %1\nFailed: %2").arg(successCount).arg(failCount));
+
+        ui->convertButton->setEnabled(true);
+        ui->inBrowseButton->setEnabled(true);
+        ui->outBrowseButton->setEnabled(true);
+
+        thread->quit();
+    });
+
+    connect(thread, &QThread::finished, worker, &QObject::deleteLater);
+    connect(thread, &QThread::finished, thread, &QObject::deleteLater);
+
+    thread->start();
 }
 
 

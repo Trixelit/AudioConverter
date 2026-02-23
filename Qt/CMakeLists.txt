@@ -27,6 +27,10 @@ if(${QT_VERSION_MAJOR} GREATER_EQUAL 6)
     qt_add_executable(AudioConverter
         MANUAL_FINALIZATION
         ${PROJECT_SOURCES}
+        worker.h
+        worker.cpp
+        fileitemwidget.h
+        fileitemwidget.cpp
     )
 # Define target properties for Android with Qt 6 as:
 #    set_property(TARGET AudioConverter APPEND PROPERTY QT_ANDROID_PACKAGE_SOURCE_DIR
